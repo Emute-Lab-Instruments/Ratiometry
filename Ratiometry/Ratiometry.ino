@@ -13,6 +13,8 @@
 #include "MedianFilter.h"
 #include "MAFilter.h"
 
+#include "ratios.hpp"
+
 
 #include "drawing.h"
 
@@ -29,37 +31,6 @@ int __not_in_flash("mydata") oscTypeBank2=0;
 
 class displayPortal {
 public:
-  void drawOsc0(int osc) {
-    tft.setCursor(50,120);
-    tft.setTextColor(ELI_BLUE);
-    tft.println(oldOsc0);
-    tft.setCursor(50,120);
-    tft.setTextColor(ELI_PINK);
-    tft.println(osc);
-    oldOsc0 = osc;
-  }
-  void drawOsc1(int osc) {
-    tft.setCursor(120,120);
-    tft.setTextColor(ELI_BLUE);
-    tft.println(oldOsc1);
-    tft.setCursor(120,120);
-    tft.setTextColor(ELI_PINK);
-    tft.println(osc);
-    oldOsc1 = osc;
-  }
-  void drawOsc2(int osc) {
-    tft.setCursor(190,120);
-    tft.setTextColor(ELI_BLUE);
-    tft.println(oldOsc2);
-    tft.setCursor(190,120);
-    tft.setTextColor(ELI_PINK);
-    tft.println(osc);
-    oldOsc2 = osc;
-  }
-private:
-  int oldOsc0=0;
-  int oldOsc1=0;
-  int oldOsc2=0;
 };
 
 displayPortal display;
@@ -68,23 +39,31 @@ displayPortal display;
 #define SCREEN_WIDTH tft.width()    //
 #define SCREEN_HEIGHT tft.height()  // Taille de l'écran
 
-#define ENCODER1_A_PIN 9
-#define ENCODER1_B_PIN 14
+#define ENCODER1_A_PIN 0
+#define ENCODER1_B_PIN 2
 #define ENCODER1_SWITCH 8
 
-#define ENCODER2_A_PIN 16
-#define ENCODER2_B_PIN 21
+#define ENCODER2_A_PIN 3
+#define ENCODER2_B_PIN 5
 #define ENCODER2_SWITCH 15
 
-#define ENCODER3_A_PIN 24
-#define ENCODER3_B_PIN 25
+#define ENCODER3_A_PIN 6
+#define ENCODER3_B_PIN 7
 #define ENCODER3_SWITCH 23
 
+#define ENCODER4_A_PIN 8
+#define ENCODER4_B_PIN 9
+#define ENCODER4_SWITCH 20
+
+#define PULSEOUT0_PIN 14
+#define PULSEOUT1_PIN 15
+#define PULSEOUT2_PIN 16
+#define PULSEOUT3_PIN 17
 
 
 namespace controls {
-  static int encoderValues[3] = {0,0,0};
-  static bool encoderSwitches[3] = {0,0,0};
+  static int encoderValues[4] = {0,0,0,0};
+  static bool encoderSwitches[4] = {0,0,0,0};
 };
 
 MovingAverageFilter<float> adcFilters[4];
@@ -197,6 +176,8 @@ static uint8_t enc2Code = 0;
 static uint16_t enc2Store = 0;
 static uint8_t enc3Code = 0;
 static uint16_t enc3Store = 0;
+static uint8_t enc4Code = 0;
+static uint16_t enc4Store = 0;
 
 int maxOscBankType = 8;
 
@@ -213,29 +194,44 @@ void updateOscBank(int &currOscBank, int change) {
 
 }
 
+
+double ratioMinMax(double val) {
+  val = std::max(val, ratioseq::RATIOMIN);
+  val = std::min(val, ratioseq::RATIOMAX);
+  return val;
+}
+
+
 void encoder1_callback() {
   int change = read_rotary(enc1Code, enc1Store, ENCODER1_A_PIN, ENCODER1_B_PIN);
   controls::encoderValues[0] += change;
-  updateOscBank(oscTypeBank0, change);
+  controls::encoderValues[0] = ratioMinMax(controls::encoderValues[0]);
   Serial.println(controls::encoderValues[0]);  
-  display.drawOsc0(oscTypeBank0);
+  ratiodata::ratios[0] = controls::encoderValues[0];
 }
 
 void encoder2_callback() {
   int change = read_rotary(enc2Code, enc2Store, ENCODER2_A_PIN, ENCODER2_B_PIN);
   controls::encoderValues[1] += change;
-  updateOscBank(oscTypeBank1, change);
+  controls::encoderValues[1] = ratioMinMax(controls::encoderValues[1]);
   Serial.println(controls::encoderValues[1]);  
-  display.drawOsc1(oscTypeBank1);
-
+  ratiodata::ratios[1] = controls::encoderValues[1];
 }
 
 void encoder3_callback() {
   int change = read_rotary(enc3Code, enc3Store, ENCODER3_A_PIN, ENCODER3_B_PIN);
   controls::encoderValues[2] += change;
-  updateOscBank(oscTypeBank2, change);
-  display.drawOsc2(oscTypeBank2);
+  controls::encoderValues[2] = ratioMinMax(controls::encoderValues[2]);
   Serial.println(controls::encoderValues[2]);  
+  ratiodata::ratios[2] = controls::encoderValues[2];
+}
+
+void encoder4_callback() {
+  int change = read_rotary(enc4Code, enc4Store, ENCODER4_A_PIN, ENCODER4_B_PIN);
+  controls::encoderValues[3] += change;
+  controls::encoderValues[3] = ratioMinMax(controls::encoderValues[3]);
+  Serial.println(controls::encoderValues[3]);  
+  ratiodata::ratios[3] = controls::encoderValues[3];
 }
 
 void encoder1_switch_callback() {
@@ -249,17 +245,49 @@ void encoder2_switch_callback() {
 void encoder3_switch_callback() {
   controls::encoderSwitches[2] = digitalRead(ENCODER3_SWITCH);  
 }
+void encoder4_switch_callback() {
+  controls::encoderSwitches[3] = digitalRead(ENCODER4_SWITCH);  
+}
 
 
 struct repeating_timer timerAdcProcessor;
+struct repeating_timer timerDSPLoop;
+
+bool __not_in_flash_func(dspLoop)(__unused struct repeating_timer *t) {
+  ratiodata::phase += 0.002;
+  if (ratiodata::phase > 1.0) {
+    ratiodata::phase -= 1.0;
+  }
+
+  digitalWrite(PULSEOUT0_PIN, ratiodata::phase > 0.5);
+
+  auto ratios1 = std::vector<double>({ratiodata::ratios[0],ratiodata::ratios[1]});
+  bool seq1 = ratioseq::rpulse(ratios1, ratiodata::pulseWidth, ratiodata::phase);
+  digitalWrite(PULSEOUT1_PIN, seq1);
+
+  auto ratios2 = std::vector<double>({ratiodata::ratios[0],ratiodata::ratios[1],ratiodata::ratios[2]});
+  bool seq2 = ratioseq::rpulse(ratios2, ratiodata::pulseWidth, ratiodata::phase);
+  digitalWrite(PULSEOUT2_PIN, seq2);
+
+  auto ratios3 = std::vector<double>({ratiodata::ratios[0],ratiodata::ratios[1],ratiodata::ratios[2],ratiodata::ratios[3]});
+  bool seq3 = ratioseq::rpulse(ratios3, ratiodata::pulseWidth, ratiodata::phase);
+  digitalWrite(PULSEOUT3_PIN, seq3);
+
+  return true;
+}
 
 void setup() {
 
+  Serial.begin();
+  // tft.begin();
+  // tft.setRotation(3);
+  // tft.fillScreen(ELI_BLUE);
+  // tft.setFreeFont(&FreeSans18pt7b);
 
-  tft.begin();
-  tft.setRotation(3);
-  tft.fillScreen(ELI_BLUE);
-  tft.setFreeFont(&FreeSans18pt7b);
+  ratiodata::ratios = {4,1,4,3};
+  ratiodata::phase=0;
+  ratiodata::pulseWidth=0.5;
+  ratiodata::sampleRate = 1000.0;
 
   for(size_t i=0; i < 4; i++) {
     adcRanges[i] = adcMaxs[i] - adcMins[i];
@@ -281,14 +309,20 @@ void setup() {
   //Encoders
   pinMode(ENCODER1_A_PIN, INPUT_PULLUP);
   pinMode(ENCODER1_B_PIN, INPUT_PULLUP);
-  pinMode(ENCODER1_SWITCH, INPUT_PULLUP);
+  // pinMode(ENCODER1_SWITCH, INPUT_PULLUP);
   pinMode(ENCODER2_A_PIN, INPUT_PULLUP);
   pinMode(ENCODER2_B_PIN, INPUT_PULLUP);
-  pinMode(ENCODER2_SWITCH, INPUT_PULLUP);
+  // pinMode(ENCODER2_SWITCH, INPUT_PULLUP);
   pinMode(ENCODER3_A_PIN, INPUT_PULLUP);
   pinMode(ENCODER3_B_PIN, INPUT_PULLUP);
-  pinMode(ENCODER3_SWITCH, INPUT_PULLUP);
+  // pinMode(ENCODER3_SWITCH, INPUT_PULLUP);
+  pinMode(ENCODER4_A_PIN, INPUT_PULLUP);
+  pinMode(ENCODER4_B_PIN, INPUT_PULLUP);
   
+  pinMode(PULSEOUT0_PIN, OUTPUT);
+  pinMode(PULSEOUT1_PIN, OUTPUT);
+  pinMode(PULSEOUT2_PIN, OUTPUT);
+  pinMode(PULSEOUT3_PIN, OUTPUT);
 
   attachInterrupt(digitalPinToInterrupt(ENCODER1_A_PIN), encoder1_callback,
                     CHANGE);
@@ -302,23 +336,32 @@ void setup() {
                     CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER3_B_PIN), encoder3_callback,
                     CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER4_A_PIN), encoder4_callback,
+                    CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER4_B_PIN), encoder4_callback,
+                    CHANGE);
 
-  attachInterrupt(digitalPinToInterrupt(ENCODER1_SWITCH), encoder1_switch_callback,
-                    CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENCODER2_SWITCH), encoder2_switch_callback,
-                    CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENCODER3_SWITCH), encoder3_switch_callback,
-                    CHANGE);
+  // attachInterrupt(digitalPinToInterrupt(ENCODER1_SWITCH), encoder1_switch_callback,
+  //                   CHANGE);
+  // attachInterrupt(digitalPinToInterrupt(ENCODER2_SWITCH), encoder2_switch_callback,
+  //                   CHANGE);
+  // attachInterrupt(digitalPinToInterrupt(ENCODER3_SWITCH), encoder3_switch_callback,
+  //                   CHANGE);
+  // attachInterrupt(digitalPinToInterrupt(ENCODER4_SWITCH), encoder3_switch_callback,
+  //                   CHANGE);
 
 
   add_repeating_timer_ms(5, adcProcessor, NULL, &timerAdcProcessor);
+  // add_repeating_timer_ms(-1/ratiodata::sampleRate, dspLoop, NULL, &timerDSPLoop);
+  add_repeating_timer_ms(-2, dspLoop, NULL, &timerDSPLoop);
 
 }
 
 
 int count=0;
 void loop() {
-  __wfi();
+  Serial.println("loop");
+  delay(1000);
 }
 
 
