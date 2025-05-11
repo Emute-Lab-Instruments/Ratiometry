@@ -19,8 +19,8 @@
 bool core1_separate_stack = true;
 
 //objects for the Encoder Event Models
-EncoderEventModel* currentModel;      //pointer for the currently a ctive model
-EncoderEventModel ratioEvents =  EncoderEventModel(); //6 Ratio event workspaces when declared!
+EncoderEventModel* currentModel;      //pointer for the currently active model
+EncoderEventModel ratioEvents[6] =  {EncoderEventModel(),EncoderEventModel(),EncoderEventModel(),EncoderEventModel(),EncoderEventModel(),EncoderEventModel()}; //6 Ratio event workspaces when declared!
 //EncoderEventModel cvEvents = (EncoderEventModel) OtherEventModel();    //6 CV output event workspaces
 //EncoderEventModel cvEvents = (EncoderEventModel) MutesEventModel();    //Mutes event workspaces ** not coed **
 
@@ -160,34 +160,67 @@ void encoder8_callback() {
 //  display.setReDraw(); No dosplay up date for speed changes ** might need to check on Model Mode later in dev if the ENC gets used**
 }
 
-void encoder1_switch_callback() {
-  bool bNow = digitalRead(ENCODER1_SWITCH); 
-  float t_since = millis() - switches::t_trigger[0];
+void processEncoderSwitch(int n, int ENCODER_SWITCH) {
+  bool bNow = digitalRead(ENCODER_SWITCH); 
+  float t_since = millis() - switches::t_trigger[n];
   
   if ( t_since < 30) return;
 
   //Serial.println(bNow);
-  if ((bNow == 0) && (switches::event_state[0] == 0)) {
-    switches::t_trigger[0] = millis(); 
-    switches::event_state[0] = 1;
+  if ((bNow == 0) && (switches::event_state[n] == 0)) {
+    switches::t_trigger[n] = millis(); 
+    switches::event_state[n] = 1;
   }
-  if ((switches::b_state[0] == 0) && (bNow == 1)&& (switches::event_state[0] == 1)) {
-    if (t_since>300) switches::event_state[0] = 3;
-    else switches::event_state[0] = 2;
+  if ((switches::b_state[n] == 0) && (bNow == 1)&& (switches::event_state[n] == 1)) {
+    if (t_since>300) switches::event_state[n] = 3;
+    else switches::event_state[n] = 2;
   }
-  switches::b_state[0] = bNow;
+  switches::b_state[n] = bNow;
 }
 
+void encoder1_switch_callback() {processEncoderSwitch(0,ENCODER1_SWITCH);}
+void encoder2_switch_callback() {processEncoderSwitch(1,ENCODER2_SWITCH);}
+void encoder3_switch_callback() {processEncoderSwitch(2,ENCODER3_SWITCH);}
+void encoder4_switch_callback() {processEncoderSwitch(3,ENCODER4_SWITCH);}
+void encoder5_switch_callback() {processEncoderSwitch(4,ENCODER5_SWITCH);}
+void encoder6_switch_callback() {processEncoderSwitch(5,ENCODER6_SWITCH);}
 
+// void encoder1_switch_callback() {
+//   bool bNow = digitalRead(ENCODER1_SWITCH); 
+//   float t_since = millis() - switches::t_trigger[0];
+  
+//   if ( t_since < 30) return;
 
+//   //Serial.println(bNow);
+//   if ((bNow == 0) && (switches::event_state[0] == 0)) {
+//     switches::t_trigger[0] = millis(); 
+//     switches::event_state[0] = 1;
+//   }
+//   if ((switches::b_state[0] == 0) && (bNow == 1)&& (switches::event_state[0] == 1)) {
+//     if (t_since>300) switches::event_state[0] = 3;
+//     else switches::event_state[0] = 2;
+//   }
+//   switches::b_state[0] = bNow;
+// }
 
-void encoder2_switch_callback() {
- // controls::encoderSwitches[1] = digitalRead(ENCODER2_SWITCH);  
-}
+// void encoder2_switch_callback() {
+//   bool bNow = digitalRead(ENCODER2_SWITCH); 
+//   float t_since = millis() - switches::t_trigger[1];
+  
+//   if ( t_since < 30) return;
 
-void encoder3_switch_callback() {
- // controls::encoderSwitches[2] = digitalRead(ENCODER3_SWITCH);  
-}
+//   //Serial.println(bNow);
+//   if ((bNow == 0) && (switches::event_state[1] == 0)) {
+//     switches::t_trigger[1] = millis(); 
+//     switches::event_state[1] = 1;
+//   }
+//   if ((switches::b_state[1] == 0) && (bNow == 1)&& (switches::event_state[1] == 1)) {
+//     if (t_since>300) switches::event_state[1] = 3;
+//     else switches::event_state[1] = 2;
+//   }
+//   switches::b_state[1] = bNow;
+// }
+
 
 double ratioMinMax(double val) {
   val = std::max(val, ratioseq::RATIOMIN);
@@ -217,6 +250,7 @@ bool __not_in_flash_func(processSwitchEvents)(__unused struct repeating_timer *t
       case 2:
         Serial.println( String(i) + " short");
         switches::event_state[i]=0;
+        setCurrentRatioEventModel(i);
         break;
       case 3:
         Serial.println( String(i) + " long");
@@ -289,16 +323,46 @@ bool __not_in_flash_func (updateNeoPixels)(__unused struct repeating_timer *t){
 
 //this loads default values - later load from storage
 void loadRatioModels(){
-  double values[8] = {4,5,4,3,6,4, 0.9, 0.002};
+  
   double maximums[8] = {32,32,32,32,32,32, 0.95, 0.004};
   double minimums[8] = {1,1,1,1,1,1, 0.05, -0.004};
   double steps[8] = {1,1,1,1,1,1, 0.05, 0.00005};
-  ratioEvents.setEncoderValues(values);
-  ratioEvents.setEncoderMaximums(maximums);
-  ratioEvents.setEncoderMinimums(minimums);
-  ratioEvents.setEncoderSteps(steps);
+
+  double values[8] = {4,5,4,3,6,4, 0.9, 0.002};
+  ratioEvents[0].setEncoderValues(values);
+
+  double values1[8] = {10,5,7,8,1,1, 0.5, 0.002};
+  ratioEvents[1].setEncoderValues(values1);
+
+  double values2[8] = {10,25,7,8,5,21, 0.3, 0.002};
+  ratioEvents[2].setEncoderValues(values2);
+
+  double values3[8] = {1,25,7,8,10,1, 0.6, 0.002};
+  ratioEvents[3].setEncoderValues(values3);
+
+  double values4[8] = {15,15,7,8,15,15, 0.3, 0.002};
+  ratioEvents[4].setEncoderValues(values4);
+
+  double values5[8] = {10,5,7,8,1,32, 0.8, 0.002};
+  ratioEvents[5].setEncoderValues(values5);
+
+  for (int i = 0; i<6; i++){
+    ratioEvents[i].setEncoderMaximums(maximums);
+    ratioEvents[i].setEncoderMinimums(minimums);
+    ratioEvents[i].setEncoderSteps(steps);
+  }
 }
 
+void setCurrentRatioEventModel(int n){
+  currentModel = &ratioEvents[n];
+  ratiodata::ratios = currentModel->encoderValues;
+  ratiodata::phase=0;
+  ratiodata::pulseWidth=&currentModel->encoderValues[6];
+  ratiodata::sampleRate = 1000.0;
+  ratiodata::phaseRate = &currentModel->encoderValues[7];
+  currentRatioModel = n;
+  display.setReDraw();
+}
 void setup() {
 
 
@@ -317,14 +381,7 @@ void setup() {
   loadRatioModels();
 
   //point current model to first workspace
-  currentModel = &ratioEvents;
-  ratiodata::ratios = currentModel->encoderValues;
-  ratiodata::phase=0;
-  ratiodata::pulseWidth=&currentModel->encoderValues[6];
-  ratiodata::sampleRate = 1000.0;
-  ratiodata::phaseRate = &currentModel->encoderValues[7]; //this gioves each workspace its oiwn phase rate - redefine to keep a fixed
-
-
+  setCurrentRatioEventModel(0);
 
   tft.init();
   tft.initDMA();
@@ -387,8 +444,12 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENCODER8_B_PIN), encoder8_callback,CHANGE);
 
   attachInterrupt(digitalPinToInterrupt(ENCODER1_SWITCH), encoder1_switch_callback,CHANGE);
-  // attachInterrupt(digitalPinToInterrupt(ENCODER2_SWITCH), encoder2_switch_callback,
-  //                   CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER2_SWITCH), encoder2_switch_callback, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER3_SWITCH), encoder3_switch_callback,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER4_SWITCH), encoder4_switch_callback, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER5_SWITCH), encoder5_switch_callback,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER6_SWITCH), encoder6_switch_callback, CHANGE);
+
   // attachInterrupt(digitalPinToInterrupt(ENCODER3_SWITCH), encoder3_switch_callback,
   //                   CHANGE);
 

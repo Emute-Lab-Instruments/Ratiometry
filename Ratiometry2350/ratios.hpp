@@ -38,6 +38,6 @@ public:
         lastAccumulatedSum = accumulatedSum;
         beat++;
     }
-    return (10*trig) + beat;    
+    return (10*trig) + beat;    //encode trigger status as <>10 thrn add current trigger - what if more than 10 'beats' in a sequence?
   }
 };

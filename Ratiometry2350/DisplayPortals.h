@@ -87,7 +87,10 @@ void drawUpdate(bool sel,double ratios[], float pulse_width){
     }
 
   }
-  drawTimer(ratiodata::phase);
+  // draw current work space and ratio workspace selection gtaphics here
+
+  
+  drawTimer(ratiodata::phase); //this need not be here as uses TFT so not drawn twice - draw once at end in Update?
   tft.pushImageDMA(0, sel * SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, sprPtr[sel]);
   
   }
