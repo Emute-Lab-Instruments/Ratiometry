@@ -89,12 +89,62 @@ void drawUpdate(bool sel,double ratios[], float pulse_width){
   }
   // draw current work space and ratio workspace selection gtaphics here
 
-  
+
   drawTimer(ratiodata::phase); //this need not be here as uses TFT so not drawn twice - draw once at end in Update?
   tft.pushImageDMA(0, sel * SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, sprPtr[sel]);
   
   }
 
+ void cvupdate(double ratios[], float pulse_width){
+  //do nothing if no changes to show
+  if (!bReDraw) return;
+  drawCVUpdate(0,ratios,pulse_width);
+  drawCVUpdate(1,ratios,pulse_width);
+  
+  bReDraw = false;
+ }
+  void drawCVUpdate(bool sel,double cvValues[], float pulse_width){
+  //this is sooo slow
+    spr[sel].fillScreen(TFT_BLACK);
+    int blokWidth = 25;
+    int blokSeparation = 4;
+    float heigthScale = 200;
+    int xOffset = 120 - 3 * blokWidth - 2.5 * blokSeparation;
+    for (int i = 0; i < 6; i++){
+      spr[sel].drawRect(xOffset, 20, blokWidth, (heigthScale * cvValues[i]), bandColour[i]);
+      xOffset += (blokWidth + blokSeparation);
+    }
+
+    //draw stuff here
+
+
+    //drawTimer(ratiodata::phase); //this need not be here as uses TFT so not drawn twice - draw once at end in Update?
+    tft.pushImageDMA(0, sel * SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, sprPtr[sel]);
+  }
+
   void setReDraw(){bReDraw = true;}
 
+};
+
+// class to display the CVs
+class CVDisplayPortal : public DisplayPortal{
+  public:
+  void drawCVUpdate(bool sel,double cvValues[], float pulse_width){
+  //this is sooo slow
+    spr[sel].fillScreen(TFT_BLACK);
+    int blokWidth = 25;
+    int blokSeparation = 4;
+    float heigthScale = 100;
+    int xOffset = 120 - 3 * blokWidth + 2.5 * blokSeparation;
+    for (int i = 0; i < 5; i++){
+      spr[sel].drawRect(xOffset, 120, blokWidth, (120 - (heigthScale * cvValues[i])), bandColour[i]);
+      xOffset += (blokWidth + blokSeparation);
+    }
+
+    //draw stuff here
+
+
+    drawTimer(ratiodata::phase); //this need not be here as uses TFT so not drawn twice - draw once at end in Update?
+    tft.pushImageDMA(0, sel * SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, sprPtr[sel]);
+  }
 };

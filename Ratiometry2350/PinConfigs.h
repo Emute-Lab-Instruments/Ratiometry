@@ -37,9 +37,29 @@
 #define ENCODER8_B_PIN 25
 #define ENCODER8_SWITCH 32
 
+#define MODESWITCH 45 //58
+
 #define PULSEOUT0_PIN 0
 #define PULSEOUT1_PIN 1 
 #define PULSEOUT2_PIN 7
 #define PULSEOUT3_PIN 8
 #define PULSEOUT4_PIN 46
 #define PULSEOUT5_PIN 47
+
+// 34 is inout
+
+//cv for stamp xl v0
+#define CVOUT0_PIN 35
+#define CVOUT1_PIN 36 
+#define CVOUT2_PIN 38
+#define CVOUT3_PIN 37
+#define CVOUT4_PIN 40
+#define CVOUT5_PIN 39
+
+//cv for ration proto board
+// #define CVOUT0_PIN 53
+// #define CVOUT1_PIN 52 
+// #define CVOUT2_PIN 51
+// #define CVOUT3_PIN 50
+// #define CVOUT4_PIN 49
+// #define CVOUT5_PIN 48
